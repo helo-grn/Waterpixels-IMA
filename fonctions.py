@@ -9,8 +9,11 @@ from skimage import io as skio
 from skimage import color, filters
 import IPython
 from skimage.transform import rescale
+from skimage.color import rgb2gray, rgb2lab
+from skimage.morphology import area_opening, area_closing
+from skimage.filters import sobel
 
-def viewimage(im, normalize=True,z=1,order=0,titre='',displayfilename=False):
+def viewimage(im, gray=False, normalize=True,z=1,order=0,titre='',displayfilename=False):
     imin=im.copy().astype(np.float32)
     imin = rescale(imin, z, order=order)
     if normalize:
@@ -20,13 +23,22 @@ def viewimage(im, normalize=True,z=1,order=0,titre='',displayfilename=False):
     else:
         imin=imin.clip(0,255)/255 
     imin=(imin*255).astype(np.uint8)
-    plt.imshow(imin)
+    print(imin.shape)
+    print(imin.dtype)
+    print(imin[0, 0])
+    if gray == True:
+        plt.imshow(imin, cmap='gray', vmin=0, vmax=255)
+    else:
+        plt.imshow(imin)
     plt.axis('off')
     plt.title(titre)
     plt.show()
     
+    
+    
 def derive(im, dir=1):
     s=im.shape
+    print(s)
     im2= np.zeros(s)
     for i in range (s[0]):
         for j in range (s[1]):
@@ -46,74 +58,130 @@ def derive(im, dir=1):
                     im2[i,j]=(im[i+1,j]-im[i-1,j])/2
     return im2
 
-'''
-def gradient(im):
-    lab_img = color.rgb2lab(im)  
-    viewimage(lab_img)
-    gradient = filters.sobel(color.rgb2gray(lab_img))  
-'''
 
-def square_grid(im, step=0):
-    w, h = im.shape
+def gradient(im):
+    ''' 
+    Compute the gradient magnitude of a gray image 
+    '''
+    gradient = filters.sobel(im)
+    return gradient
+
+def preprocess_image(im, sigma):
+    area = int((sigma ** 2) / 16)
+    # If image is color, apply per channel
+    if im.ndim == 3:
+        im_proc = np.zeros_like(im)
+        for c in range(im.shape[2]):
+            im_proc[..., c] = area_opening(im[..., c], area)
+            im_proc[..., c] = area_closing(im_proc[..., c], area)
+    else:
+        im_proc = area_opening(im, area)
+        im_proc = area_closing(im_proc, area)
+    return im_proc
+
+def lab_gradient(im):
+    lab = rgb2lab(im)
+    grad = np.zeros(im.shape[:2])
+    for c in range(3):
+        grad += sobel(lab[..., c]) ** 2
+    grad = np.sqrt(grad)
+    return grad
+
+def square_grid(im, sigma=0):
+    w, h = im.shape[:2]
     print(h, w)
-    if step == 0:
-        step = min(h, w) // 10
-    x = np.arange(0, h, step)
-    y = np.arange(0, w, step)
+    if sigma == 0:
+        sigma = min(h, w) // 10
+    x = np.arange(0, h, sigma)
+    y = np.arange(0, w, sigma)
     xv, yv = np.meshgrid(x, y, indexing='ij')
     print(xv.shape, yv.shape)
     return xv, yv
 
-def hexagonal_grid(im, step=0):
-    w, h = im.shape
-    print(h, w)
-    if step == 0:
-        step = min(h, w) // 5
-    x1 = np.arange(0, h, step*np.sqrt(3))
-    y1 = np.arange(0, w, step)
-    xv1, yv1 = np.meshgrid(x1, y1, indexing='ij')
-    print(xv1, yv1)
-    x2 = np.arange(step*np.sqrt(3)//2, h, step*np.sqrt(3))
-    y2 = np.arange(step//2, w, step)
-    xv2, yv2 = np.meshgrid(x2, y2, indexing='ij')
+def hexagonal_grid(im, sigma):
+    w, h = im.shape[:2] # (321, 481)
+    grid_im = np.zeros((w, h))
+    Q = []
+    for x in range(sigma//2, h, int(np.sqrt(3)*sigma)):
+        for y in range(sigma//2, w, sigma):
+            grid_im[y, x] = 1
+            Q.append((y, x))
+    for x in range(sigma//2+int(np.sqrt(3)*sigma)//2, h, int(np.sqrt(3)*sigma)):
+        for y in range(0, w, sigma):
+            grid_im[y, x] = 1
+            Q.append((y, x))
+    return grid_im, Q
 
-    xv = np.concatenate([xv1.flatten(), xv2.flatten()])
-    yv = np.concatenate([yv1.flatten(), yv2.flatten()])
-    
-    return xv, yv
+def d(p, q):
+    return np.sqrt((p[0]-q[0])**2 + (p[1]-q[1])**2)
 
-def read_image(filename, grey):
-    im = skio.imread(filename, as_gray=grey)
+def distance(im, Q, sigma):
+    w, h = im.shape[:2]
+    dist_im = np.zeros((w, h))
+    for row in range(0, h):
+        for col in range(0, w):
+            p = (col, row)
+            min_dist = np.inf
+            for q in Q:
+                if d(p, q) - min_dist < 0:
+                    min_dist = d(p, q)
+            dist_im[col, row] = 2/sigma * min_dist
+    return dist_im
+            
+
+def read_image(filename):
+    im = skio.imread(filename)
     return im
 
 def test(n):
     if n == 0:
         # Test square grid
-        im = read_image('Lake.png', True)
+        im = read_image('Lake.png')
         xv, yv = square_grid(im)
         plt.plot(xv, yv, marker='o', color='k', linestyle='none')
         plt.axis('scaled')
         plt.show()
     if n == 2: 
         # Test hexagonal grid
-        im = read_image('Lake.png', True)
-        xv, yv = hexagonal_grid(im)
+        im = read_image('Lake.png')
+        xv, yv = hexagonal_grid(im, 40)
         plt.plot(xv, yv, marker='o', color='k', linestyle='none')
         plt.axis('scaled')
         plt.show()
     if n == 3:
+        # Test view image
+        im = read_image('Lake.png')
+        viewimage(im)
+    if n == 4: 
+        # Test gray image read
+        im = read_image('Lake.png')
+        im_gray = rgb2gray(im)
+        viewimage(im_gray, gray=True)
+    if n == 5:
         # Test gradient
-        im = read_image('Lake.png', True)
+        im = read_image('Lake.png')
         grad = derive(im)
         viewimage(grad)
-    if n == 4:
-        # Test view image
-        im = read_image('Lake.png', False)
-        viewimage(im)
-    if n == 5:
+    if n == 6:
         # Test gradient 2
-        im = read_image('Lake.png', True)
-        grad = gradient(im)
-        viewimage(grad)
+        im = read_image('Lake.png')
+        #im_gray = rgb2gray(im)
+        h, w, _ = im.shape
+        sigma = min(h, w) // 10
+        im_proc = preprocess_image(im, sigma)  
+        print("a")
+        grad = lab_gradient(im_proc)
+        print("b")
+        print(grad.shape)
+        #grad2 = gradient(im_gray)
+        viewimage(grad, gray=True)
+        #viewimage(grad2, gray=True)
+    if n == 7:
+        # Hexagonal grid and distance to centers
+        im = read_image('Lake.png')
+        grid_im, Q = hexagonal_grid(im, 40)
+        viewimage(grid_im, gray=True)
+        dist_im = distance(im, Q, 40)
+        viewimage(dist_im, gray=True)
         
-test(5)
+test(7)

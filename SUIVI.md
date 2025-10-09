@@ -6,3 +6,9 @@ Début de fonctions.py: affichage et dérivée
 
 ## 07/10/2025
 Importation des images du papier et création des fonctions grilles (carrée et hexagonale) et distance au centre
+
+## 08/10/2025
+Somme image et grille
+
+## 09/10/2025
+Première reunion: voir CR sur le README

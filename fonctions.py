@@ -12,6 +12,7 @@ from skimage.transform import rescale
 from skimage.color import rgb2gray, rgb2lab
 from skimage.morphology import area_opening, area_closing
 from skimage.filters import sobel
+from skimage.segmentation import watershed, mark_boundaries
 
 def viewimage(im, gray=False, normalize=True,z=1,order=0,titre='',displayfilename=False):
     imin=im.copy().astype(np.float32)
@@ -82,6 +83,8 @@ def preprocess_image(im, sigma):
 def lab_gradient(im):
     lab = rgb2lab(im)
     grad = np.zeros(im.shape[:2])
+    print(lab.shape)
+    # 3 channels
     for c in range(3):
         grad += sobel(lab[..., c]) ** 2
     grad = np.sqrt(grad)
@@ -128,6 +131,17 @@ def distance(im, Q, sigma):
             dist_im[col, row] = 2/sigma * min_dist
     return dist_im
             
+def gradient_regularization(dist_im, grad_im, k):
+    reg_im = grad_im + k * dist_im
+    return reg_im
+
+def create_markers(im_shape, Q):
+    markers = np.zeros(im_shape[:2], dtype=np.int32)
+    for idx, (y, x) in enumerate(Q):
+        # Ensure coordinates are within image bounds
+        if 0 <= y < markers.shape[0] and 0 <= x < markers.shape[1]:
+            markers[y, x] = idx + 1  # labels start from 1
+    return markers
 
 def read_image(filename):
     im = skio.imread(filename)
@@ -177,11 +191,29 @@ def test(n):
         viewimage(grad, gray=True)
         #viewimage(grad2, gray=True)
     if n == 7:
-        # Hexagonal grid and distance to centers
         im = read_image('Lake.png')
+        # Compute gradient
+        sigma = 40
+        im_proc = preprocess_image(im, sigma)  
+        grad = lab_gradient(im_proc)
+        print(grad)
+        viewimage(grad, gray=True)
+        # Compute hexagonal grid
         grid_im, Q = hexagonal_grid(im, 40)
         viewimage(grid_im, gray=True)
+        # Compute distance to centers
         dist_im = distance(im, Q, 40)
         viewimage(dist_im, gray=True)
+        # Compute regularized gradient
+        reg_im = gradient_regularization(dist_im, grad, 8)
+        print(reg_im)
+        viewimage(reg_im, gray=True)
+        # Compute watershed transform
+        markers = create_markers(im.shape, Q)
+        labels = watershed(reg_im, markers=markers, watershed_line=True)
+        viewimage(labels, gray=True)
+        # Overlay boundaries on original image
+        final = mark_boundaries(im, labels)
+        viewimage(final)
         
 test(7)

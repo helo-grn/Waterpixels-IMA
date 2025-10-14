@@ -204,6 +204,9 @@ def test(n):
         # Compute hexagonal grid
         grid_im, Q = hexagonal_grid(im, 40)
         viewimage(grid_im, gray=True)
+        # Compute square grid
+        grid_im2, Q = square_grid(im, 40)
+        viewimage(grid_im2, gray=True)
         # Compute distance to centers
         dist_im = distance(im, Q, 40)
         viewimage(dist_im, gray=True)

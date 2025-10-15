@@ -12,3 +12,8 @@ Somme image et grille
 
 ## 09/10/2025
 Première reunion: voir CR sur le README
+
+## 10/10/2025
+Tests
+Gradient sur la clarté (premier paramètre lab): moins de points (zones réduites à un pixel, dégénérées)
+Tests sur grille carré: on capte moins de directions, donc moins sensible à des contours qui ne sont pas sur une horizontale ou verticale.

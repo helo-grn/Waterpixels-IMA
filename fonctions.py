@@ -38,6 +38,8 @@ def viewimage(im, gray=False, normalize=True,z=1,order=0,titre='',displayfilenam
     
     
 def derive(im, dir=1):
+    im = read_image(im)
+    im = rgb2gray(im)
     s=im.shape
     print(s)
     im2= np.zeros(s)
@@ -57,6 +59,7 @@ def derive(im, dir=1):
                     im2[i,j]=im[i,j]-im[i-1,j]
                 else:
                     im2[i,j]=(im[i+1,j]-im[i-1,j])/2
+    im2= np.sqrt(im2**2)
     return im2
 
 
@@ -206,6 +209,9 @@ def test(n):
         # Compute hexagonal grid
         grid_im, Q = hexagonal_grid(im, 40)
         viewimage(grid_im, gray=True)
+        # Compute square grid
+        grid_im2, Q = square_grid(im, 40)
+        viewimage(grid_im2, gray=True)
         # Compute distance to centers
         dist_im = distance(im, Q, 40)
         viewimage(dist_im, gray=True)
@@ -246,4 +252,5 @@ def test(n):
         final = mark_boundaries(im, labels)
         viewimage(final)
         
-test(8)
+
+test(7)

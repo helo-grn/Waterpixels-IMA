@@ -20,3 +20,5 @@ Attentes pour le rendu final: savoir expliquer l'implémentation choisie et pren
     - à nous d'organiser
     - prochaine réunion avant le 24 (présentation du rendu?)
     - essayer de faire au moins toutes les deux semaines
+
+Espace lab : https://fr.wikipedia.org/wiki/L*a*b*_CIE_1976

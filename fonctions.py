@@ -80,26 +80,31 @@ def preprocess_image(im, sigma):
         im_proc = area_closing(im_proc, area)
     return im_proc
 
+# def lab_gradient(im):
+#     lab = rgb2lab(im)
+#     grad = np.zeros(im.shape[:2])
+#     print(lab.shape)
+#     # 3 channels
+#     for c in range(3):
+#         grad += sobel(lab[..., c]) ** 2
+#     grad = np.sqrt(grad)
+#     return grad
+
 def lab_gradient(im):
     lab = rgb2lab(im)
-    grad = np.zeros(im.shape[:2])
-    print(lab.shape)
-    # 3 channels
-    for c in range(3):
-        grad += sobel(lab[..., c]) ** 2
+    grad = sobel(lab[..., 0]) ** 2
     grad = np.sqrt(grad)
     return grad
 
 def square_grid(im, sigma=0):
     w, h = im.shape[:2]
-    print(h, w)
-    if sigma == 0:
-        sigma = min(h, w) // 10
-    x = np.arange(0, h, sigma)
-    y = np.arange(0, w, sigma)
-    xv, yv = np.meshgrid(x, y, indexing='ij')
-    print(xv.shape, yv.shape)
-    return xv, yv
+    grid_im = np.zeros((w, h))
+    Q = []
+    for x in range(sigma//2, h, sigma):
+        for y in range(sigma//2, w, sigma):
+            grid_im[y, x] = 1
+            Q.append((y, x))
+    return grid_im, Q
 
 def hexagonal_grid(im, sigma):
     w, h = im.shape[:2] # (321, 481)
@@ -205,7 +210,32 @@ def test(n):
         dist_im = distance(im, Q, 40)
         viewimage(dist_im, gray=True)
         # Compute regularized gradient
-        reg_im = gradient_regularization(dist_im, grad, 8)
+        reg_im = gradient_regularization(dist_im, grad, 10)
+        print(reg_im)
+        viewimage(reg_im, gray=True)
+        # Compute watershed transform
+        markers = create_markers(im.shape, Q)
+        labels = watershed(reg_im, markers=markers, watershed_line=True)
+        viewimage(labels, gray=True)
+        # Overlay boundaries on original image
+        final = mark_boundaries(im, labels)
+        viewimage(final)
+    if n == 8:
+        im = read_image('Lake.png')
+        # Compute gradient
+        sigma = 40
+        im_proc = preprocess_image(im, sigma)  
+        grad = lab_gradient(im_proc)
+        print(grad)
+        viewimage(grad, gray=True)
+        # Compute hexagonal grid
+        grid_im, Q = square_grid(im, 40)
+        viewimage(grid_im, gray=True)
+        # Compute distance to centers
+        dist_im = distance(im, Q, 40)
+        viewimage(dist_im, gray=True)
+        # Compute regularized gradient
+        reg_im = gradient_regularization(dist_im, grad, 10)
         print(reg_im)
         viewimage(reg_im, gray=True)
         # Compute watershed transform
@@ -216,4 +246,4 @@ def test(n):
         final = mark_boundaries(im, labels)
         viewimage(final)
         
-test(7)
+test(8)

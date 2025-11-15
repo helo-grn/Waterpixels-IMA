@@ -23,4 +23,3 @@ def hexagonal_grid(im, sigma):
             grid_im[y, x] = 1
             Q.append((y, x))
     return grid_im, Q
-

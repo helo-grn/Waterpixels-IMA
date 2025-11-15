@@ -2,9 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage import io as skio
 from skimage.transform import rescale
-from skimage.color import rgb2gray
 from skimage.morphology import area_opening, area_closing
-from skimage.filters import sobel
 from skimage.segmentation import watershed, mark_boundaries
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import distance_transform_edt
@@ -18,7 +16,7 @@ def read_image(filename):
     im = skio.imread(filename)
     return im
 
-def viewimage(im, gray=False, normalize=True,z=1,order=0,titre='',displayfilename=False):
+def viewimage(im, gray=False, normalize=True,z=1,order=0,titre=''):
     imin=im.copy().astype(np.float32)
     imin = rescale(imin, z, order=order)
     if normalize:
@@ -64,10 +62,25 @@ def create_markers(im_shape, Q):
             markers[y, x] = idx + 1  # labels start from 1
     return markers
 
-def waterpixels(im, gradient_method='naive', grid='hexagonal'):
-    im = read_image('Lake.png')
+def waterpixels(image_name, nb_pixels, gradient_method='naive', grid='hexagonal', distance_alg='Chamfer', watershed_alg='skimage'):
+    """
+    Assembles all the functions to compute the waterpixels of a given image and then display the boundaries on top of the original image.
+
+    Parameters:
+        image_name: The filename of the input image (RGB).
+        nb_pixels: The number of waterpixels to compute alongside the smallest edge of the image.
+        gradient_method: Can be _naive_ (discrete approximation of the derivative) or _lab_ (Sobel filter on the lightness component in the CIELAB color space).
+        grid: The approximate shape of the resulting waterpixels. Can be _hexagonal_ or _square_.
+        distance_alg: The algorithm used to compute the distance map. Can be _naive_ or _Chamfer_.
+        watershed_alg: The algorithm used to compute the watershed transform. Can be _skimage_ or _fast_.
+    
+    Returns:
+        seg: The segmentation of the given image using waterpixels.
+    """
+    im = read_image(image_name)
+    l = min(im.shape[0], im.shape[1])
     # Compute gradient
-    sigma = 40
+    sigma = np.round(l // nb_pixels)
     im_proc = preprocess_image(im, sigma)  
     if gradient_method == 'lab':
         grad = lab_gradient(im_proc)
@@ -78,57 +91,43 @@ def waterpixels(im, gradient_method='naive', grid='hexagonal'):
     
     # Compute grid
     if grid == 'square':
-        grid_im, Q = square_grid(im, 40)
+        grid_im, Q = square_grid(im, sigma)
     else:
-        grid_im, Q = hexagonal_grid(im, 40)
+        grid_im, Q = hexagonal_grid(im, sigma)
         
     viewimage(grid_im, gray=True)
     
     # Compute distance to centers
-    dist_im = naive_distance(im, Q, 40)
+    if distance_alg == 'naive':
+        dist_im = naive_distance(im, Q)
+    else:
+        dist_im = chamfer_distance_5_7_11(grid_im)
     viewimage(dist_im, gray=True)
     
     # Compute regularized gradient
-    reg_im = gradient_regularization(dist_im, grad, 10)
+    reg_im = gradient_regularization(dist_im, grad, 0.7)
     viewimage(reg_im, gray=True)
     
     # Compute watershed transform
     markers = create_markers(im.shape, Q)
-    labels = watershed(reg_im, markers=markers, watershed_line=True)
-    viewimage(labels, gray=True)
     
-    # Overlay boundaries on original image
-    final = mark_boundaries(im, labels)
-    viewimage(final)
-
-def test(n):
-    if n == 0:
-        im = read_image('Lake.png')
-        # im = rgb2gray(im)
-        # im = np.round(im, 3)
-        reg_im = np.load('reg_im.npy')
-        reg_im = gaussian_filter(reg_im, sigma=2)
+    if watershed_alg == 'fast':
+        reg_im = gaussian_filter(reg_im, sigma=3)
         reg_im = reg_im * 10
         reg_im = np.round(reg_im)
         reg_im = np.round(reg_im / 40) * 40
         labels = fast_watershed2(reg_im)
-        print(labels.shape)
-        final = mark_boundaries(im, labels)
-        viewimage(final)
-    if n == 1:
-        # Trying with our own distance transform
-        im = read_image('Lake.png')
-        # Compute gradient
-        sigma = 40
-        im_proc = preprocess_image(im, sigma)  
-        grad = lab_gradient(im_proc)
-        print(grad)
-        viewimage(grad, gray=True)
-        # Compute hexagonal grid
-        grid_im, Q = hexagonal_grid(im, 40)
-        viewimage(grid_im, gray=True)
-        # Compute distance to centers
-        dist_im = chamfer_distance_transform(grid_im)
-        viewimage(dist_im, gray=True)
+    else:
+        labels = watershed(reg_im, markers=markers, watershed_line=True)
+    
+    viewimage(labels, gray=True)
+    
+    # Overlay boundaries on original image
+    seg = mark_boundaries(im, labels)
+
+    return seg
 
 #faire un truc d'histogramme pour découper en 10 niveaux de gris
+
+seg = waterpixels('Lake.png', 8, gradient_method='lab', grid='hexagonal', distance_alg='Chamfer', watershed_alg='skimage')
+viewimage(seg)

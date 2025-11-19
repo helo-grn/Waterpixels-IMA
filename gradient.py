@@ -59,3 +59,4 @@ def lab_gradient(im):
     grad = sobel(lab_im[..., 0]) ** 2
     grad = np.sqrt(grad)
     return grad
+

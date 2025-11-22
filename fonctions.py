@@ -11,6 +11,7 @@ from gradient import *
 from grids import *
 from distance import *
 from watershed import *
+from evaluation import *
 
 def read_image(filename):
     im = skio.imread(filename)
@@ -62,12 +63,12 @@ def create_markers(im_shape, Q):
             markers[y, x] = idx + 1  # labels start from 1
     return markers
 
-def waterpixels(image_name, nb_pixels, gradient_method='naive', grid='hexagonal', distance_alg='Chamfer', watershed_alg='skimage'):
+def waterpixels(im, nb_pixels, k=0.7, gradient_method='naive', grid='hexagonal', distance_alg='Chamfer', watershed_alg='skimage'):
     """
     Assembles all the functions to compute the waterpixels of a given image and then display the boundaries on top of the original image.
 
     Parameters:
-        image_name: The filename of the input image (RGB).
+        im: The input image (RGB).
         nb_pixels: The number of waterpixels to compute alongside the smallest edge of the image.
         gradient_method: Can be _naive_ (discrete approximation of the derivative) or _lab_ (Sobel filter on the lightness component in the CIELAB color space).
         grid: The approximate shape of the resulting waterpixels. Can be _hexagonal_ or _square_.
@@ -77,7 +78,6 @@ def waterpixels(image_name, nb_pixels, gradient_method='naive', grid='hexagonal'
     Returns:
         seg: The segmentation of the given image using waterpixels.
     """
-    im = read_image(image_name)
     l = min(im.shape[0], im.shape[1])
     # Compute gradient
     sigma = np.round(l // nb_pixels)
@@ -105,7 +105,7 @@ def waterpixels(image_name, nb_pixels, gradient_method='naive', grid='hexagonal'
     viewimage(dist_im, gray=True)
     
     # Compute regularized gradient
-    reg_im = gradient_regularization(dist_im, grad, 0.7)
+    reg_im = gradient_regularization(dist_im, grad, k)
     viewimage(reg_im, gray=True)
     
     # Compute watershed transform
@@ -120,14 +120,39 @@ def waterpixels(image_name, nb_pixels, gradient_method='naive', grid='hexagonal'
     else:
         labels = watershed(reg_im, markers=markers, watershed_line=True)
     
-    viewimage(labels, gray=True)
-    
-    # Overlay boundaries on original image
-    seg = mark_boundaries(im, labels)
+    return labels
 
-    return seg
+im = read_image('./BSDS300/images/train/176035.jpg')
+labels = waterpixels(im, 8, k=3, gradient_method='lab', grid='hexagonal', distance_alg='Chamfer', watershed_alg='skimage')
+viewimage(labels, gray=True)
+# viewimage(labels, gray=True)
+# # Overlay boundaries on original image
+# seg = mark_boundaries(im, labels)
+# viewimage(seg)
+borders = morphological_gradient(labels)
+borders[borders > 0] = 1
+borders = add_borders(borders)
+viewimage(borders, gray=True)
 
-#faire un truc d'histogramme pour découper en 10 niveaux de gris
+human_seg = open('./BSDS300/human/gray/1130/176035.seg', 'r')
+seg = np.zeros((im.shape[0], im.shape[1]))
+seg2 = np.zeros((im.shape[0], im.shape[1]))
+print(seg.shape)
+lines = human_seg.readlines()[11:]
+# print(lines)
+# print(len(lines))
+for line in lines:
+    label, row, c0, c1 = map(int, line.split(' '))
+    seg[row, c0:c1+1] = label
+viewimage(seg, gray=True)
+gt = morphological_gradient(seg)
+gt[gt > 0] = 1
+viewimage(gt, gray=True)
 
-seg = waterpixels('Lake.png', 8, gradient_method='lab', grid='hexagonal', distance_alg='Chamfer', watershed_alg='skimage')
-viewimage(seg)
+eval = evaluate_waterpixels_measures(labels, gt)
+print(eval)
+
+overlap = im.copy()
+overlap[borders == 1] = [255, 255, 255]
+results = f"BR: {eval[0]:.4f}, CD: {eval[1]:.4f}, MF: {eval[2]:.4f}"
+viewimage(overlap, titre=results)

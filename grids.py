@@ -1,6 +1,6 @@
 import numpy as np
 
-def square_grid(im, sigma=0):
+def square_grid(im, sigma):
     w, h = im.shape[:2]
     grid_im = np.zeros((w, h))
     Q = []
@@ -11,7 +11,7 @@ def square_grid(im, sigma=0):
     return grid_im, Q
 
 def hexagonal_grid(im, sigma):
-    w, h = im.shape[:2] # (321, 481)
+    w, h = im.shape[:2]
     grid_im = np.zeros((w, h))
     Q = []
     for x in range(sigma//2, h, int(np.sqrt(3)*sigma)):

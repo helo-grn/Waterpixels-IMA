@@ -35,17 +35,12 @@ def chamfer_distance_5_7_11(binary_image):
     Compute the chamfer distance transform using 5-7-11 mask.
     
     Parameters:
-    -----------
-    binary_image : numpy.ndarray
-        Binary image where markers are pixels equal to 1
+    binary_image : Binary image where markers are pixels equal to 1
     
     Returns:
-    --------
-    distance_map : numpy.ndarray
-        Distance map where each pixel contains its distance to nearest marker
+    distance_map : Distance map where each pixel contains its distance to the nearest marker
     """
-    # Initialize distance map with large values
-    # Set markers (pixels == 1) to distance 0
+    # Initialize distance map with large values and zeroes for markers
     distance_map = np.where(binary_image == 1, 0, np.inf)
     
     height, width = binary_image.shape

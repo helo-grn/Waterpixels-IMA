@@ -47,16 +47,30 @@ def gradient(im):
 
 def lab_gradient(im):
     """
-    Computes the gradient of an image.
+    Computes the gradient of an image using the L*a*b* color space.
 
     Parameters:
         im: The input image (RGB).
 
     Returns:
-        grad: The gradient on the perceptual lightness.
+        grad: The gradient on the perceptual lightness component in the L*a*b* color space.
     """
     lab_im = rgb2lab(im)
     grad = sobel(lab_im[..., 0]) ** 2
     grad = np.sqrt(grad)
     return grad
 
+def gradient_regularization(dist_im, grad_im, k):
+    """
+    Regularize the gradient image with the distance map.
+
+    Parameters:
+        dist_im: The distance map.
+        grad_im: The gradient image.
+        k: The regularization coefficient.
+
+    Returns:
+        reg_im: The regularized gradient.
+    """
+    reg_im = grad_im + k * dist_im
+    return reg_im

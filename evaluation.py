@@ -2,7 +2,9 @@ import numpy as np
 from scipy.ndimage import distance_transform_cdt, center_of_mass
 import skimage.morphology as morpho
 
-
+# -----------------------------------------------------------
+# Utility functions
+# -----------------------------------------------------------
 def morphological_gradient(partition):
     """
     Computes the morphological gradient of an image partition using a 4-neighborhood (cross-shaped structuring element).
@@ -31,6 +33,30 @@ def add_borders(partition):
     bordered[:, 0] = 1
     bordered[:, -1] = 1
     return bordered
+
+def segmentation_borders(partition):
+    borders = morphological_gradient(partition)
+    borders[borders > 0] = 1
+    borders = add_borders(borders)
+    return borders
+
+def gt_borders(human_seg):
+    # Read the .seg file and populate seg array
+    lines = human_seg.readlines()
+    w = int(lines[4].split()[1])
+    h = int(lines[5].split()[1])
+    seg = np.zeros((h, w))
+
+    lines = lines[11:]
+    for line in lines:
+        label, row, c0, c1 = map(int, line.split(' '))
+        seg[row, c0:c1+1] = label
+
+    # Compute GT borders
+    gt = morphological_gradient(seg)
+    gt[gt > 0] = 1
+    return gt
+
 
 # -----------------------------------------------------------
 # 1. Boundary Recall (BR)

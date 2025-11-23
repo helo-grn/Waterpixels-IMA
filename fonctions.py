@@ -3,9 +3,8 @@ import matplotlib.pyplot as plt
 from skimage import io as skio
 from skimage.transform import rescale
 from skimage.morphology import area_opening, area_closing
-from skimage.segmentation import watershed, mark_boundaries
+from skimage.segmentation import watershed
 from scipy.ndimage import gaussian_filter
-from scipy.ndimage import distance_transform_edt
 
 from gradient import *
 from grids import *
@@ -50,10 +49,6 @@ def preprocess_image(im, sigma):
         im_proc = area_opening(im, area)
         im_proc = area_closing(im_proc, area)
     return im_proc
-            
-def gradient_regularization(dist_im, grad_im, k):
-    reg_im = grad_im + k * dist_im
-    return reg_im
 
 def create_markers(im_shape, Q):
     markers = np.zeros(im_shape[:2], dtype=np.int32)
@@ -79,9 +74,12 @@ def waterpixels(im, nb_pixels, k=0.7, gradient_method='naive', grid='hexagonal',
         seg: The segmentation of the given image using waterpixels.
     """
     l = min(im.shape[0], im.shape[1])
-    # Compute gradient
+    # ¨Preprocess image
     sigma = np.round(l // nb_pixels)
     im_proc = preprocess_image(im, sigma)  
+    viewimage(im_proc, gray=False)
+    
+    # Compute gradient
     if gradient_method == 'lab':
         grad = lab_gradient(im_proc)
     else:
@@ -123,36 +121,20 @@ def waterpixels(im, nb_pixels, k=0.7, gradient_method='naive', grid='hexagonal',
     return labels
 
 im = read_image('./BSDS300/images/train/176035.jpg')
-labels = waterpixels(im, 8, k=3, gradient_method='lab', grid='hexagonal', distance_alg='Chamfer', watershed_alg='skimage')
+
+labels = waterpixels(im, 8, k=0.7, gradient_method='lab', grid='hexagonal', distance_alg='Chamfer', watershed_alg='skimage')
 viewimage(labels, gray=True)
-# viewimage(labels, gray=True)
-# # Overlay boundaries on original image
-# seg = mark_boundaries(im, labels)
-# viewimage(seg)
-borders = morphological_gradient(labels)
-borders[borders > 0] = 1
-borders = add_borders(borders)
-viewimage(borders, gray=True)
 
 human_seg = open('./BSDS300/human/gray/1130/176035.seg', 'r')
-seg = np.zeros((im.shape[0], im.shape[1]))
-seg2 = np.zeros((im.shape[0], im.shape[1]))
-print(seg.shape)
-lines = human_seg.readlines()[11:]
-# print(lines)
-# print(len(lines))
-for line in lines:
-    label, row, c0, c1 = map(int, line.split(' '))
-    seg[row, c0:c1+1] = label
-viewimage(seg, gray=True)
-gt = morphological_gradient(seg)
-gt[gt > 0] = 1
+gt = gt_borders(human_seg)
 viewimage(gt, gray=True)
 
 eval = evaluate_waterpixels_measures(labels, gt)
 print(eval)
 
 overlap = im.copy()
+borders = segmentation_borders(labels)
+viewimage(borders, gray=True)
 overlap[borders == 1] = [255, 255, 255]
 results = f"BR: {eval[0]:.4f}, CD: {eval[1]:.4f}, MF: {eval[2]:.4f}"
 viewimage(overlap, titre=results)

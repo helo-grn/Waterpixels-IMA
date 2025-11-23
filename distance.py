@@ -2,6 +2,7 @@ import numpy as np
 import grids as grd
 import distance as dst
 from skimage.color import rgb2gray
+import scipy.ndimage as ndi
 
 def d(p, q):
     """
@@ -89,7 +90,7 @@ def chamfer_distance_5_7_11(binary_image):
     
     return distance_map/5
 
-def minima_gradient(im, grad, grid):
+def minima_gradient(im, grad, grid, size):
     """
     Computes the minima of the gradient of an image.
     First we compute the minima of the gradient g. Each minimum is a connected component.
@@ -107,7 +108,7 @@ def minima_gradient(im, grad, grid):
     """
     im_shape = im.shape
     markers = np.zeros(im_shape[:2], dtype=np.int32)
-    labeled_minima, num_minima = ndi.label(grad == ndi.minimum_filter(grad, size=3))
+    labeled_minima, num_minima = ndi.label(grad == ndi.minimum_filter(grad, size=size))
     
     for cell_label in np.unique(grid):
         if cell_label == 0:
@@ -116,6 +117,7 @@ def minima_gradient(im, grad, grid):
         cell_mask = (grid == cell_label)
         cell_minima_labels = np.unique(labeled_minima[cell_mask & (labeled_minima > 0)])
         
+        print(cell_minima_labels)
         if len(cell_minima_labels) == 0:
             continue  # No minima in this cell
         
@@ -134,4 +136,3 @@ def minima_gradient(im, grad, grid):
             markers[labeled_minima == selected_minimum] = cell_label
     
     return markers
-

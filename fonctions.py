@@ -26,9 +26,6 @@ def viewimage(im, gray=False, normalize=True,z=1,order=0,titre=''):
     else:
         imin=imin.clip(0,255)/255 
     imin=(imin*255).astype(np.uint8)
-    print(imin.shape)
-    print(imin.dtype)
-    print(imin[0, 0])
     if gray == True:
         plt.imshow(imin, cmap='gray', vmin=0, vmax=255)
     else:
@@ -58,23 +55,34 @@ def create_markers(im_shape, Q):
             markers[y, x] = idx + 1  # labels start from 1
     return markers
 
-def waterpixels(im, nb_pixels, k=0.7, gradient_method='naive', grid='hexagonal', distance_alg='Chamfer', watershed_alg='skimage'):
+def waterpixels(im, nb_pixels, k=0.7, gradient_method='naive', grid='hexagonal', markers='centers', distance_alg='Chamfer', watershed_alg='skimage'):
     """
     Assembles all the functions to compute the waterpixels of a given image and then display the boundaries on top of the original image.
 
     Parameters:
         im: The input image (RGB).
         nb_pixels: The number of waterpixels to compute alongside the smallest edge of the image.
+        k: The regularization parameter for the gradient regularization step.
         gradient_method: Can be _naive_ (discrete approximation of the derivative) or _lab_ (Sobel filter on the lightness component in the CIELAB color space).
         grid: The approximate shape of the resulting waterpixels. Can be _hexagonal_ or _square_.
-        distance_alg: The algorithm used to compute the distance map. Can be _naive_ or _Chamfer_.
+        markers: The choice of markers for the watershed transform. Can be _centers_ (centers of the grid cells) or _minima_ (minima of the gradient within each cell).
+        distance_alg: The algorithm used to compute the distance map. Can be _naive_ or _chanfrein_.
         watershed_alg: The algorithm used to compute the watershed transform. Can be _skimage_ or _fast_.
     
     Returns:
         seg: The segmentation of the given image using waterpixels.
     """
-    l = min(im.shape[0], im.shape[1])
+    
+    # Make sure that the parameters are valid
+    assert gradient_method in ['naive', 'lab'], "Invalid gradient method. Choose 'naive' or 'lab'."
+    assert grid in ['square', 'hexagonal'], "Invalid grid. Choose 'square' or 'hexagonal'."
+    assert markers in ['centers', 'minima'], "Invalid markers. Choose 'centers' or 'minima'."
+    assert distance_alg in ['naive', 'chanfrein'], "Invalid distance algorithm. Choose 'naive' or 'chanfrein'."
+    assert watershed_alg in ['fast', 'skimage'], "Invalid watershed algorithm. Choose 'fast' or 'skimage'."
+
+    
     # ¨Preprocess image
+    l = min(im.shape[0], im.shape[1])
     sigma = np.round(l // nb_pixels)
     im_proc = preprocess_image(im, sigma)  
     viewimage(im_proc, gray=False)
@@ -82,59 +90,68 @@ def waterpixels(im, nb_pixels, k=0.7, gradient_method='naive', grid='hexagonal',
     # Compute gradient
     if gradient_method == 'lab':
         grad = lab_gradient(im_proc)
-    else:
+    elif gradient_method == 'naive':
         grad = gradient(im_proc)
-        
     viewimage(grad, gray=True)
     
     # Compute grid
     if grid == 'square':
         grid_im, Q = square_grid(im, sigma)
-    else:
+    elif grid == 'hexagonal':
         grid_im, Q = hexagonal_grid(im, sigma)
-        
     viewimage(grid_im, gray=True)
     
     # Compute distance to centers
     if distance_alg == 'naive':
         dist_im = naive_distance(im, Q)
-    else:
+    elif distance_alg == 'chanfrein':
         dist_im = chamfer_distance_5_7_11(grid_im)
     viewimage(dist_im, gray=True)
+    
+    # Display distance map with grid centers
+    color_dist = np.zeros(im.shape)
+    color_dist[:, :, 0] = dist_im
+    color_dist[:, :, 1] = dist_im
+    color_dist[:, :, 2] = dist_im
+    color_dist[np.where(grid_im>0)] = [0, np.max(dist_im), 0]
+    viewimage(color_dist, gray=False)
+        
+    # Compute markers
+    if markers == 'minima':
+        a = fast_watershed2(dist_im)
+        b = segmentation_borders(a)
+        a[np.where(b==1)] = 0
+        viewimage(a, gray=True)
+
+        minima = minima_gradient(im, grad, a, 3)
+        minima_with_markers = np.zeros(im.shape)
+        minima_with_markers[np.where(minima>0)] = [0, 255, 0]
+        minima_with_markers[np.where(b==1)] = [255, 255, 255]
+        viewimage(minima_with_markers, gray=False)
+        
+        minima[minima>0] = 1
+        dist_im = chamfer_distance_5_7_11(minima)
+        dist_with_markers = np.zeros(im.shape)
+        dist_with_markers[:, :, 0] = dist_im
+        dist_with_markers[:, :, 1] = dist_im
+        dist_with_markers[:, :, 2] = dist_im
+        dist_with_markers[np.where(minima>0)] = [0, np.max(dist_im), 0]
+        viewimage(dist_with_markers, gray=False)
+    elif markers == 'centers':
+        markers = create_markers(im.shape, Q)
     
     # Compute regularized gradient
     reg_im = gradient_regularization(dist_im, grad, k)
     viewimage(reg_im, gray=True)
     
     # Compute watershed transform
-    markers = create_markers(im.shape, Q)
-    
     if watershed_alg == 'fast':
         reg_im = gaussian_filter(reg_im, sigma=3)
         reg_im = reg_im * 10
         reg_im = np.round(reg_im)
-        reg_im = np.round(reg_im / 40) * 40
+        reg_im = np.round(reg_im / sigma) * sigma
         labels = fast_watershed2(reg_im)
-    else:
+    elif watershed_alg == 'skimage':
         labels = watershed(reg_im, markers=markers, watershed_line=True)
     
     return labels
-
-im = read_image('./BSDS300/images/train/176035.jpg')
-
-labels = waterpixels(im, 8, k=0.7, gradient_method='lab', grid='hexagonal', distance_alg='Chamfer', watershed_alg='skimage')
-viewimage(labels, gray=True)
-
-human_seg = open('./BSDS300/human/gray/1130/176035.seg', 'r')
-gt = gt_borders(human_seg)
-viewimage(gt, gray=True)
-
-eval = evaluate_waterpixels_measures(labels, gt)
-print(eval)
-
-overlap = im.copy()
-borders = segmentation_borders(labels)
-viewimage(borders, gray=True)
-overlap[borders == 1] = [255, 255, 255]
-results = f"BR: {eval[0]:.4f}, CD: {eval[1]:.4f}, MF: {eval[2]:.4f}"
-viewimage(overlap, titre=results)

@@ -118,7 +118,7 @@ def waterpixels(im, nb_pixels, k=0.7, gradient_method='naive', grid='hexagonal',
         
     # Compute markers
     if markers == 'minima':
-        a = fast_watershed2(dist_im)
+        a = fast_watershed(dist_im)
         b = segmentation_borders(a)
         a[np.where(b==1)] = 0
         viewimage(a, gray=True)
@@ -150,7 +150,7 @@ def waterpixels(im, nb_pixels, k=0.7, gradient_method='naive', grid='hexagonal',
         reg_im = reg_im * 10
         reg_im = np.round(reg_im)
         reg_im = np.round(reg_im / sigma) * sigma
-        labels = fast_watershed2(reg_im)
+        labels = fast_watershed(reg_im)
     elif watershed_alg == 'skimage':
         labels = watershed(reg_im, markers=markers, watershed_line=True)
     

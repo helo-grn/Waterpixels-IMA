@@ -1,4 +1,4 @@
-from fonctions import *
+from waterpixels import *
 
 # -----------------------------------------------------------
 # Test images

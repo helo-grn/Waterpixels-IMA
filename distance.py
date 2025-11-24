@@ -117,7 +117,6 @@ def minima_gradient(im, grad, grid, size):
         cell_mask = (grid == cell_label)
         cell_minima_labels = np.unique(labeled_minima[cell_mask & (labeled_minima > 0)])
         
-        print(cell_minima_labels)
         if len(cell_minima_labels) == 0:
             continue  # No minima in this cell
         

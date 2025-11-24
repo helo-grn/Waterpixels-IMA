@@ -85,49 +85,48 @@ def waterpixels(im, nb_pixels, k=0.7, gradient_method='naive', grid='hexagonal',
     l = min(im.shape[0], im.shape[1])
     sigma = np.round(l // nb_pixels)
     im_proc = preprocess_image(im, sigma)  
-    viewimage(im_proc, gray=False)
+    viewimage(im_proc, gray=False, titre='Preprocessed image')
     
     # Compute gradient
     if gradient_method == 'lab':
         grad = lab_gradient(im_proc)
     elif gradient_method == 'naive':
         grad = gradient(im_proc)
-    viewimage(grad, gray=True)
+    viewimage(grad, gray=True, titre='Gradient image')
     
     # Compute grid
     if grid == 'square':
         grid_im, Q = square_grid(im, sigma)
     elif grid == 'hexagonal':
         grid_im, Q = hexagonal_grid(im, sigma)
-    viewimage(grid_im, gray=True)
+    viewimage(grid_im, gray=True, titre='Grid image')
     
     # Compute distance to centers
     if distance_alg == 'naive':
         dist_im = naive_distance(im, Q)
     elif distance_alg == 'chanfrein':
         dist_im = chamfer_distance_5_7_11(grid_im)
-    viewimage(dist_im, gray=True)
+    viewimage(dist_im, gray=True, titre='Distance map')
     
     # Display distance map with grid centers
-    color_dist = np.zeros(im.shape)
-    color_dist[:, :, 0] = dist_im
-    color_dist[:, :, 1] = dist_im
-    color_dist[:, :, 2] = dist_im
-    color_dist[np.where(grid_im>0)] = [0, np.max(dist_im), 0]
-    viewimage(color_dist, gray=False)
+    if markers == 'centers':
+        color_dist = np.zeros(im.shape)
+        color_dist[:, :, 0] = dist_im
+        color_dist[:, :, 1] = dist_im
+        color_dist[:, :, 2] = dist_im
+        color_dist[np.where(grid_im>0)] = [0, np.max(dist_im), 0]
+        viewimage(color_dist, gray=False, titre='Distance map with grid centers')
         
     # Compute markers
     if markers == 'minima':
         a = fast_watershed(dist_im)
         b = segmentation_borders(a)
         a[np.where(b==1)] = 0
-        viewimage(a, gray=True)
-
         minima = minima_gradient(im, grad, a, 3)
         minima_with_markers = np.zeros(im.shape)
         minima_with_markers[np.where(minima>0)] = [0, 255, 0]
         minima_with_markers[np.where(b==1)] = [255, 255, 255]
-        viewimage(minima_with_markers, gray=False)
+        viewimage(minima_with_markers, gray=False, titre='Gradient minima in each grid cell')
         
         minima[minima>0] = 1
         dist_im = chamfer_distance_5_7_11(minima)
@@ -136,13 +135,13 @@ def waterpixels(im, nb_pixels, k=0.7, gradient_method='naive', grid='hexagonal',
         dist_with_markers[:, :, 1] = dist_im
         dist_with_markers[:, :, 2] = dist_im
         dist_with_markers[np.where(minima>0)] = [0, np.max(dist_im), 0]
-        viewimage(dist_with_markers, gray=False)
+        viewimage(dist_with_markers, gray=False, titre='Distance map with minima markers')
     elif markers == 'centers':
         markers = create_markers(im.shape, Q)
     
     # Compute regularized gradient
     reg_im = gradient_regularization(dist_im, grad, k)
-    viewimage(reg_im, gray=True)
+    viewimage(reg_im, gray=True, titre='Regularized gradient image')
     
     # Compute watershed transform
     if watershed_alg == 'fast':

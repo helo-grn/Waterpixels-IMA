@@ -87,7 +87,5 @@ def fast_watershed(im):
                         if imout[r] == MASK:
                             queue.put(r)
                             imout[r] = current_label
-
-        print(f"Height {h:.4f} done")
     
     return imout
